@@ -1,76 +1,122 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-  const bannerImgNew = document.getElementById('banner-img-new');
-  const yearEl   = document.getElementById('year-text');
-  const logoIcon = document.getElementById('logo-icon');
-  const engTxt   = document.getElementById('eng-txt');
+  const overlayLeft  = document.getElementById('overlay-left');
+  const overlayRight = document.getElementById('overlay-right');
+  const yearEl       = document.getElementById('year-text');
+  const logoIcon     = document.getElementById('logo-icon');
+  const engTxt       = document.getElementById('eng-txt');
 
-  let loopTimer = null; // ← 타이머 참조 저장용
+  const timers = [];
+  let loopTimer = null;
 
-  function countUp(from, to, duration, el) {
+  function addTimer(fn, delay) {
+    timers.push(setTimeout(fn, delay));
+  }
+
+  function clearAllTimers() {
+    timers.forEach(t => clearTimeout(t));
+    timers.length = 0;
+    clearTimeout(loopTimer);
+  }
+
+  function countLinear(from, to, duration, el) {
     let startTime = null;
     function step(ts) {
       if (!startTime) startTime = ts;
       const progress = Math.min((ts - startTime) / duration, 1);
-      const eased = progress < 0.5
-        ? 2 * progress * progress
-        : -1 + (4 - 2 * progress) * progress;
-      el.textContent = Math.floor(eased * (to - from) + from) + '년 3월.';
+      el.textContent = Math.floor(progress * (to - from) + from) + '년 3월.';
       if (progress < 1) requestAnimationFrame(step);
     }
     requestAnimationFrame(step);
   }
 
-  function forwardTransition() {
-    console.log('▶ 순방향 시작');
-    countUp(1998, 2028, 900, yearEl);
-    setTimeout(() => bannerImgNew.classList.add('reveal'), 400);
-    setTimeout(() => logoIcon.classList.add('show'), 1400);
-    setTimeout(() => engTxt.classList.add('show'), 1800);
-
-    // 기존 타이머 취소 후 새로 등록
-    clearTimeout(loopTimer);
-    loopTimer = setTimeout(() => reverseTransition(), 4500);
+  // 오버레이 초기화 (19% 지점으로 리셋)
+  function resetOverlays() {
+    overlayLeft.style.transition  = 'none';
+    overlayRight.style.transition = 'none';
+    overlayLeft.style.clipPath    = 'inset(0 81% 0 19%)'; // 19% 지점에서 숨김
+    overlayRight.style.clipPath   = 'inset(0 81% 0 19%)'; // 19% 지점에서 숨김
+    overlayLeft.getBoundingClientRect(); // reflow
   }
 
-  function reverseTransition() {
-    console.log('◀ 역방향 시작');
-    engTxt.classList.remove('show');
-    setTimeout(() => logoIcon.classList.remove('show'), 300);
-    setTimeout(() => bannerImgNew.classList.remove('reveal'), 600);
-    setTimeout(() => countUp(2028, 1998, 900, yearEl), 700);
+  // ── 순방향: 1998 → 2028 ──
+  // 19% 지점에서 왼쪽(→0%)과 오른쪽(→100%)으로 동시에 열림
+  function forwardTransition() {
+    clearAllTimers();
+    resetOverlays();
 
-    // 기존 타이머 취소 후 새로 등록
-    clearTimeout(loopTimer);
-    loopTimer = setTimeout(() => forwardTransition(), 4000);
+    countLinear(1998, 2028, 5000, yearEl);
+
+    // Stage 1: 빠르게 초기 일부 열림 (1초)
+    addTimer(() => {
+      overlayLeft.style.transition  = 'clip-path 1s ease-in';
+      overlayRight.style.transition = 'clip-path 5s ease-in';
+      overlayLeft.style.clipPath    = 'inset(0 81% 0 0%)';  // 왼쪽으로 빠르게
+      overlayRight.style.clipPath   = 'inset(0 81% 0 19%)'; // 오른쪽으로 빠르게
+    }, 0);
+
+    // Stage 2: 2초 대기 후 나머지 천천히 열림 (5초)
+    addTimer(() => {
+      overlayLeft.style.transition  = 'clip-path 5s ease-out';
+      overlayRight.style.transition = 'clip-path 5s ease-out';
+      overlayLeft.style.clipPath    = 'inset(0 81% 0 0%)';  // 왼쪽 끝까지
+      overlayRight.style.clipPath   = 'inset(0 0% 0 18%)';  // 오른쪽 끝까지
+    }, 3000);
+
+    // 완료 후 로고 & 영문 텍스트 등장
+    addTimer(() => {
+      logoIcon.classList.add('show');
+      engTxt.classList.add('show');
+    }, 7000);
+
+    loopTimer = setTimeout(() => reverseTransition(), 15000);
+  }
+
+  // ── 역방향: 2028 → 1998 ──
+  // 19% 지점으로 왼쪽과 오른쪽이 동시에 닫힘
+  function reverseTransition() {
+    clearAllTimers();
+
+    logoIcon.classList.remove('show');
+    engTxt.classList.remove('show');
+
+    countLinear(2028, 1998, 5000, yearEl);
+
+    // Stage 1: 빠르게 초기 일부 닫힘 (1초)
+    addTimer(() => {
+      overlayLeft.style.transition  = 'clip-path 1s ease-in';
+      overlayRight.style.transition = 'clip-path 2s ease-in';
+      overlayLeft.style.clipPath    = 'inset(0 81% 0 19%)';  // 왼쪽 일부 닫힘
+      overlayRight.style.clipPath   = 'inset(0 81% 0 19%)'; // 오른쪽 일부 닫힘
+    }, 0);
+
+    // Stage 2: 2초 대기 후 나머지 천천히 닫힘 (5초)
+    addTimer(() => {
+      overlayLeft.style.transition  = 'clip-path 1s ease-out';
+      overlayRight.style.transition = 'clip-path 5s ease-out';
+      overlayLeft.style.clipPath    = 'inset(0 81% 0 19%)'; // 19% 지점으로 닫힘
+      overlayRight.style.clipPath   = 'inset(0 81% 0 19%)'; // 19% 지점으로 닫힘
+    }, 3000);
+
+    loopTimer = setTimeout(() => forwardTransition(), 14000);
   }
 
   forwardTransition();
 
-const hamburger = document.getElementById('hamburger');
-const navbar    = document.querySelector('.navbar');
+  // ── 햄버거 메뉴 ──
+  const hamburger = document.getElementById('hamburger');
+  const navbar    = document.querySelector('.navbar');
 
-hamburger.addEventListener('click', () => {
-  hamburger.classList.toggle('active'); // X 아이콘 전환
-  navbar.classList.toggle('open');      // 메뉴 열기/닫기
-});
-
-// 메뉴 항목 클릭 시 자동 닫기
-document.querySelectorAll('.navbtn1 a').forEach(link => {
-  link.addEventListener('click', () => {
-    hamburger.classList.remove('active');
-    navbar.classList.remove('open');
+  hamburger.addEventListener('click', () => {
+    hamburger.classList.toggle('active');
+    navbar.classList.toggle('open');
   });
-});
-// 배너 관련 요소들의 margin/padding 전부 출력
-['#banner-old', '#banner-old .container', '#view-cards', 'main', 'body'].forEach(sel => {
-  const el = document.querySelector(sel);
-  if (!el) return;
-  const s = getComputedStyle(el);
-  console.log(`\n[${sel}]`);
-  console.log(`margin: ${s.marginTop} ${s.marginRight} ${s.marginBottom} ${s.marginLeft}`);
-  console.log(`padding: ${s.paddingTop} ${s.paddingRight} ${s.paddingBottom} ${s.paddingLeft}`);
-});
-// 콘솔에 붙여넣기
-console.log(document.querySelector('header').offsetHeight);
-});
+
+  document.querySelectorAll('.navbtn1 a').forEach(link => {
+    link.addEventListener('click', () => {
+      hamburger.classList.remove('active');
+      navbar.classList.remove('open');
+    });
+  });
+
+}); // DOMContentLoaded 닫는 괄호
